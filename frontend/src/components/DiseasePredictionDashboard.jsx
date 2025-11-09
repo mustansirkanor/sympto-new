@@ -413,51 +413,101 @@ export default function EnhancedDiseasePredictionDashboard() {
     setTextInputs({});
   };
 
-  const handleSubmit = async (e) => {
+//   const handleSubmit = async (e) => {
+//   e.preventDefault();
+//   setProcessing(true);
+
+//   try {
+//     // For image-based models
+//     if (config.type === "image") {
+//       const formData = new FormData();
+//       formData.append('image', imageFile);
+
+//       const response = await fetch('http://localhost:5000/api/predict', {
+//         method: 'POST',
+//         body: formData,
+//       });
+
+//       const result = await response.json();
+
+//       if (response.ok) {
+//         setReportData({
+//           diagnosis: result.prediction === "Parasitized" 
+//             ? "Analysis indicates presence of malaria parasites in blood cells. Immediate medical consultation is strongly recommended for treatment."
+//             : "No malaria parasites detected. Blood cells appear healthy with normal morphology.",
+//           confidence: result.confidence,
+//           riskLevel: result.risk_level,
+//           severity: Math.floor((result.confidence / 100) * 10),
+//           imageAnalysis: "The AI model analyzed cell morphology, color patterns, and structural characteristics to detect presence of Plasmodium parasites.",
+//         });
+//         setShowReport(true);
+//       } else {
+//         alert('Error: ' + (result.error || 'Failed to get prediction'));
+//       }
+//     } 
+//     // For text-based models (diabetes, heart disease)
+//     else {
+//       // You can add text-based prediction logic here later
+//       alert('Text-based prediction not yet implemented');
+//     }
+//   } catch (error) {
+//     console.error('Prediction error:', error);
+//     alert('Failed to process prediction. Please try again.');
+//   } finally {
+//     setProcessing(false);
+//   }
+// };
+
+const handleSubmit = async (e) => {
   e.preventDefault();
   setProcessing(true);
 
   try {
-    // For image-based models
-    if (config.type === "image") {
-      const formData = new FormData();
-      formData.append('image', imageFile);
+    // Validation
+    if (!imageFile) {
+      alert('Please upload an image first');
+      setProcessing(false);
+      return;
+    }
 
-      const response = await fetch('http://localhost:5000/api/predict', {
-        method: 'POST',
-        body: formData,
+    console.log('Uploading image:', imageFile.name);
+
+    // Create FormData
+    const formData = new FormData();
+    formData.append('image', imageFile);
+
+    // Send to backend
+    const response = await fetch('http://localhost:5000/api/predict', {
+      method: 'POST',
+      body: formData,
+    });
+
+    console.log('Response status:', response.status);
+
+    const result = await response.json();
+    console.log('Response data:', result);
+
+    if (response.ok && result.success) {
+      setReportData({
+        diagnosis: result.data.prediction === "Parasitized" 
+          ? "Analysis indicates presence of malaria parasites in blood cells. Immediate medical consultation is strongly recommended for treatment."
+          : "No malaria parasites detected. Blood cells appear healthy with normal morphology.",
+        confidence: result.data.confidence,
+        riskLevel: result.data.risk_level,
+        severity: Math.floor((result.data.confidence / 100) * 10),
+        imageAnalysis: "The AI model analyzed cell morphology, color patterns, and structural characteristics to detect presence of Plasmodium parasites.",
       });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setReportData({
-          diagnosis: result.prediction === "Parasitized" 
-            ? "Analysis indicates presence of malaria parasites in blood cells. Immediate medical consultation is strongly recommended for treatment."
-            : "No malaria parasites detected. Blood cells appear healthy with normal morphology.",
-          confidence: result.confidence,
-          riskLevel: result.risk_level,
-          severity: Math.floor((result.confidence / 100) * 10),
-          imageAnalysis: "The AI model analyzed cell morphology, color patterns, and structural characteristics to detect presence of Plasmodium parasites.",
-        });
-        setShowReport(true);
-      } else {
-        alert('Error: ' + (result.error || 'Failed to get prediction'));
-      }
-    } 
-    // For text-based models (diabetes, heart disease)
-    else {
-      // You can add text-based prediction logic here later
-      alert('Text-based prediction not yet implemented');
+      setShowReport(true);
+    } else {
+      alert('Error: ' + (result.error || 'Failed to get prediction'));
     }
   } catch (error) {
     console.error('Prediction error:', error);
-    alert('Failed to process prediction. Please try again.');
+    alert('Failed to connect to backend. Make sure both servers are running.');
   } finally {
     setProcessing(false);
   }
 };
-
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white mt-10">
