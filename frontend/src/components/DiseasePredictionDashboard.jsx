@@ -606,7 +606,7 @@ export default function EnhancedDiseasePredictionDashboard() {
         "Uninfected": `No malaria parasites detected. Blood smear appears normal (${confidence}% confidence).`
       },
       kidney: {
-        "Cyst": `Kidney cyst detected with ${confidence}% confidence. Consult urologist for evaluation.`,
+        "Cyst": `Kidneys cyst detected with ${confidence}% confidence. Consult urologist for evaluation.`,
         "Normal": `Kidney appears normal with ${confidence}% confidence.`,
         "Stone": `Kidney stone detected with ${confidence}% confidence. Immediate urologist consultation recommended.`,
         "Tumor": `Kidney tumor detected with ${confidence}% confidence. URGENT: Consult oncologist immediately.`
