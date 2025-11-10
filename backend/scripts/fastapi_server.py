@@ -8,7 +8,7 @@ import io
 import re
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.applications import InceptionV3
 from tensorflow.keras import layers
 import warnings
 
@@ -27,9 +27,9 @@ app.add_middleware(
 def clean_text(text):
     """Clean text for depression detection"""
     text = str(text).lower()
-    text = re.sub(r'http\S+', '', text)  # Remove URLs
-    text = re.sub(r'[^a-z\s]', '', text)  # Keep only letters and spaces
-    text = re.sub(r'\s+', ' ', text).strip()  # Remove extra spaces
+    text = re.sub(r'http\S+', '', text)
+    text = re.sub(r'[^a-z\s]', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 # ========== PREPROCESSING ==========
@@ -42,15 +42,17 @@ def preprocess_malaria(img: Image.Image):
     arr = np.array(img, dtype=np.float32) / 255.0
     return np.expand_dims(arr, axis=0)
 
-def preprocess_pneumonia(img: Image.Image):
-    """Pneumonia: 224x224 RGB, scale /255"""
-    img = to_rgb(img).resize((224, 224))
-    arr = np.array(img, dtype=np.float32) / 255.0
+def preprocess_kidney(img: Image.Image):
+    """Kidney: 299x299 RGB, InceptionV3 preprocessing"""
+    img = to_rgb(img).resize((299, 299))
+    arr = np.array(img, dtype=np.float32)
+    # InceptionV3 preprocessing: scale to [-1, 1]
+    arr = tf.keras.applications.inception_v3.preprocess_input(arr)
     return np.expand_dims(arr, axis=0)
 
 # ========== MODELS ==========
 malaria_model = None
-pneumonia_model = None
+kidney_model = None
 diabetes_model = None
 diabetes_scaler = None
 depression_model = None
@@ -58,7 +60,11 @@ depression_vectorizer = None
 
 # Load Malaria Model
 try:
-    base = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights=None)
+    base = keras.applications.MobileNetV2(
+        input_shape=(128, 128, 3),
+        include_top=False,
+        weights=None
+    )
     base.trainable = False
     malaria_model = keras.Sequential([
         base,
@@ -74,25 +80,25 @@ try:
 except Exception as e:
     print(f"✗ Malaria: {e}")
 
-# Load Pneumonia Model
+# Load Kidney Model
 try:
-    pneumonia_model = keras.models.load_model(
-        "../models/densenet169_pneumonia_best.h5",
+    kidney_model = keras.models.load_model(
+        "../models/final_inceptionv3_kidney_finetuned.h5",
         compile=False
     )
-    print("✓ Pneumonia model loaded")
+    print("✓ Kidney model loaded")
 except Exception as e:
-    print(f"✗ Pneumonia: {e}")
+    print(f"✗ Kidney: {e}")
 
-# Load Diabetes Model and Scaler
-try:
-    with open("../models/diabetes_gb_model.pkl", "rb") as f:
-        diabetes_model = pickle.load(f)
-    with open("../models/scaler.pkl", "rb") as f:
-        diabetes_scaler = pickle.load(f)
-    print("✓ Diabetes model and scaler loaded")
-except Exception as e:
-    print(f"✗ Diabetes: {e}")
+# Load Diabetes Model and Scaler (commented out for now)
+# try:
+#     with open("../models/diabetes_gb_model.pkl", "rb") as f:
+#         diabetes_model = pickle.load(f)
+#     with open("../models/scaler.pkl", "rb") as f:
+#         diabetes_scaler = pickle.load(f)
+#     print("✓ Diabetes model and scaler loaded")
+# except Exception as e:
+#     print(f"✗ Diabetes: {e}")
 
 # Load Depression Model and Vectorizer
 try:
@@ -125,18 +131,18 @@ def home():
         "message": "Disease Prediction API",
         "models": {
             "malaria": malaria_model is not None,
-            "pneumonia": pneumonia_model is not None,
-            "diabetes": diabetes_model is not None,
+            "kidney": kidney_model is not None,
+            "diabetes": False,  # Temporarily disabled
             "depression": depression_model is not None,
         },
     }
 
-@app.post("/predict/malaria")
-async def predict_malaria(file: UploadFile = File(...)):
+@app.post("/api/predict/malaria")
+async def predict_malaria(image: UploadFile = File(...)):
     if malaria_model is None:
         raise HTTPException(500, "Malaria model not loaded")
     try:
-        img = Image.open(io.BytesIO(await file.read()))
+        img = Image.open(io.BytesIO(await image.read()))
         x = preprocess_malaria(img)
         y = malaria_model.predict(x, verbose=0)
         p = float(y[0][0])
@@ -148,121 +154,91 @@ async def predict_malaria(file: UploadFile = File(...)):
             risk = "High" if conf > 80 else "Moderate"
         
         return {
-            "prediction": label,
-            "confidence": round(conf, 2),
-            "risk_level": risk,
-            "probabilities": {
-                "Parasitized": round((1 - p) * 100, 2),
-                "Uninfected": round(p * 100, 2),
-            },
+            "success": True,
+            "data": {
+                "prediction": label,
+                "confidence": round(conf, 2),
+                "risk_level": risk,
+                "probabilities": {
+                    "Parasitized": round((1 - p) * 100, 2),
+                    "Uninfected": round(p * 100, 2),
+                },
+            }
         }
     except Exception as e:
         raise HTTPException(400, str(e))
 
-@app.post("/predict/pneumonia")
-async def predict_pneumonia(file: UploadFile = File(...)):
-    if pneumonia_model is None:
-        raise HTTPException(500, "Pneumonia model not loaded")
+@app.post("/api/predict/kidney")
+async def predict_kidney(image: UploadFile = File(...)):
+    if kidney_model is None:
+        raise HTTPException(500, "Kidney model not loaded")
     try:
-        img = Image.open(io.BytesIO(await file.read()))
-        x = preprocess_pneumonia(img)
-        y = pneumonia_model.predict(x, verbose=0)[0]
+        img = Image.open(io.BytesIO(await image.read()))
+        x = preprocess_kidney(img)
+        y = kidney_model.predict(x, verbose=0)[0]
         
-        if len(y) == 2:
-            p_normal, p_pneumonia = float(y[0]), float(y[1])
-        else:
-            p_pneumonia = float(y[0])
-            p_normal = 1.0 - p_pneumonia
+        # Class names from notebook
+        class_names = ["Cyst", "Normal", "Stone", "Tumor"]
+        predicted_idx = int(np.argmax(y))
+        label = class_names[predicted_idx]
+        conf = float(y[predicted_idx]) * 100
         
-        label = "Pneumonia" if p_pneumonia >= 0.5 else "Normal"
-        conf = (p_pneumonia if label == "Pneumonia" else p_normal) * 100
-        risk = "High" if label == "Pneumonia" and conf >= 80 else ("Moderate" if label == "Pneumonia" else "Low")
+        # Risk level logic
+        if label == "Normal":
+            risk = "Low"
+        elif label in ["Cyst", "Stone"]:
+            risk = "Moderate" if conf > 70 else "High"
+        else:  # Tumor
+            risk = "High"
+        
+        probabilities = {class_names[i]: round(float(y[i]) * 100, 2) for i in range(len(class_names))}
         
         return {
-            "prediction": label,
-            "confidence": round(conf, 2),
-            "risk_level": risk,
-            "probabilities": {
-                "Pneumonia": round(p_pneumonia * 100, 2),
-                "Normal": round(p_normal * 100, 2),
-            },
+            "success": True,
+            "data": {
+                "prediction": label,
+                "confidence": round(conf, 2),
+                "risk_level": risk,
+                "probabilities": probabilities,
+            }
         }
     except Exception as e:
         raise HTTPException(400, str(e))
 
-@app.post("/predict/diabetes")
-async def predict_diabetes(data: DiabetesInput):
-    if diabetes_model is None or diabetes_scaler is None:
-        raise HTTPException(500, "Diabetes model not loaded")
-    try:
-        input_data = np.array([[
-            data.Pregnancies,
-            data.Glucose,
-            data.BloodPressure,
-            data.SkinThickness,
-            data.Insulin,
-            data.BMI,
-            data.DiabetesPedigreeFunction,
-            data.Age
-        ]])
-        
-        scaled_data = diabetes_scaler.transform(input_data)
-        prediction = diabetes_model.predict(scaled_data)[0]
-        probability = diabetes_model.predict_proba(scaled_data)[0]
-        
-        label = "Diabetes" if prediction == 1 else "No Diabetes"
-        conf = float(probability[prediction]) * 100
-        risk = "High" if label == "Diabetes" and conf >= 80 else ("Moderate" if label == "Diabetes" else "Low")
-        
-        return {
-            "prediction": label,
-            "confidence": round(conf, 2),
-            "risk_level": risk,
-            "probabilities": {
-                "No Diabetes": round(probability[0] * 100, 2),
-                "Diabetes": round(probability[1] * 100, 2),
-            },
-        }
-    except Exception as e:
-        raise HTTPException(400, str(e))
-
-@app.post("/predict/depression")
+@app.post("/api/predict/depression")
 async def predict_depression(data: DepressionInput):
     if depression_model is None or depression_vectorizer is None:
         raise HTTPException(500, "Depression model not loaded")
     try:
-        # Clean the input text
         cleaned_text = clean_text(data.text)
         
         if not cleaned_text.strip():
             raise HTTPException(400, "Text input is empty after cleaning")
         
-        # Vectorize the text
         text_vector = depression_vectorizer.transform([cleaned_text])
-        
-        # Make prediction
         prediction = depression_model.predict(text_vector)[0]
         probability = depression_model.predict_proba(text_vector)[0]
         
-        # Map prediction to label (based on your notebook)
         label = "Depressed" if prediction == "depressed" else "Non-Depressed"
         
-        # Get confidence for the predicted class
         if prediction == "depressed":
-            conf = float(probability[0]) * 100  # Index 0 is depressed
+            conf = float(probability[0]) * 100
             risk = "High" if conf >= 80 else "Moderate"
         else:
-            conf = float(probability[1]) * 100  # Index 1 is non-depressed
+            conf = float(probability[1]) * 100
             risk = "Low"
         
         return {
-            "prediction": label,
-            "confidence": round(conf, 2),
-            "risk_level": risk,
-            "probabilities": {
-                "Depressed": round(probability[0] * 100, 2),
-                "Non-Depressed": round(probability[1] * 100, 2),
-            },
+            "success": True,
+            "data": {
+                "prediction": label,
+                "confidence": round(conf, 2),
+                "risk_level": risk,
+                "probabilities": {
+                    "Depressed": round(probability[0] * 100, 2),
+                    "Non-Depressed": round(probability[1] * 100, 2),
+                },
+            }
         }
     except Exception as e:
         raise HTTPException(400, str(e))
