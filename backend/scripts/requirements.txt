@@ -4,3 +4,4 @@ python-multipart
 pillow
 numpy
 tensorflow
+scikit-learn==1.3.2
