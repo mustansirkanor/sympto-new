@@ -1,24 +1,21 @@
 import React, { useState } from "react";
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Gemini API Integration using official SDK
+// Gemini API Integration
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "AIzaSyDTzO559LJyMItPX0p244aAE3AYpbY3VXQ";
 
-// Updated Gemini function with conditional prompts based on prediction result
 const generateGeminiReport = async (disease, prediction, confidence, formData = null) => {
-  // Determine if disease is detected or not
   const isPositive = 
-    prediction === "Pneumonia" || 
+    prediction === "Cyst" || 
+    prediction === "Stone" || 
+    prediction === "Tumor" ||
     prediction === "Parasitized" || 
-    prediction === "Diabetes" || 
     prediction === "Depressed";
 
   const prompt = isPositive 
-    ? `You are a compassionate medical AI assistant. A patient has been diagnosed with ${disease} with ${confidence}% confidence.
-Prediction Result: ${prediction}
-${formData ? `Patient Data: ${JSON.stringify(formData)}` : ''}
+    ? `You are a compassionate medical AI assistant. A patient has been diagnosed with ${disease} - ${prediction} with ${confidence}% confidence.
 
-Generate a comprehensive, empathetic health report for a patient who HAS BEEN DIAGNOSED with ${disease}:
+Generate a comprehensive, empathetic health report for a patient who HAS BEEN DIAGNOSED with ${prediction}:
 
 **1. Explanation of Your Condition**
 Explain what ${prediction} means, how it affects the body, and why early treatment is important. (2-3 sentences)
@@ -49,17 +46,16 @@ List 5 critical warning signs that require IMMEDIATE medical attention:
 * [Emergency warning sign 5]
 
 Use an empathetic, supportive tone. This is a POSITIVE diagnosis - the patient needs treatment guidance.`
-    : `You are a supportive medical AI assistant. A patient's test results show NO signs of ${disease} with ${confidence}% confidence.
+    : `You are a supportive medical AI assistant. A patient's test results show NO signs of disease with ${confidence}% confidence.
 Prediction Result: ${prediction}
-${formData ? `Patient Data: ${JSON.stringify(formData)}` : ''}
 
 Generate a reassuring health report for a patient who DOES NOT have ${disease}:
 
 **1. Understanding Your Results**
-Explain that the test shows no signs of ${disease.replace(' Detection', '').replace(' Risk Assessment', '')}, what this means, and why it's good news. (2-3 sentences)
+Explain that the test shows no signs of disease, what this means, and why it's good news. (2-3 sentences)
 
 **2. Preventive Health Tips**
-Provide 5 tips to PREVENT ${disease.replace(' Detection', '').replace(' Risk Assessment', '')} and maintain good health:
+Provide 5 tips to PREVENT diseases and maintain good health:
 * [Prevention tip 1]
 * [Prevention tip 2]
 * [Prevention tip 3]
@@ -86,14 +82,11 @@ List 5 symptoms that, if they appear in the future, should prompt a medical visi
 Use a positive, encouraging tone. This is a NEGATIVE diagnosis - celebrate the good news while promoting prevention.`;
 
   try {
-    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
-      contents: prompt,
-    });
-
-    return response.text || "Unable to generate recommendations at this time.";
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text() || "Unable to generate recommendations at this time.";
   } catch (error) {
     console.error("Gemini API Error:", error);
     return "Unable to generate recommendations. Please try again later.";
@@ -102,11 +95,11 @@ Use a positive, encouraging tone. This is a NEGATIVE diagnosis - celebrate the g
 
 // Structured Medical Report Component
 const StructuredMedicalReport = ({ reportText, prediction }) => {
-  // Determine if disease is detected
   const isPositive = 
-    prediction === "Pneumonia" || 
+    prediction === "Cyst" || 
+    prediction === "Stone" || 
+    prediction === "Tumor" ||
     prediction === "Parasitized" || 
-    prediction === "Diabetes" || 
     prediction === "Depressed";
 
   const parseReport = (text) => {
@@ -152,7 +145,7 @@ const StructuredMedicalReport = ({ reportText, prediction }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header Card - Different based on result */}
+      {/* Header Card */}
       <div className={`backdrop-blur-xl ${isPositive ? 'bg-gradient-to-br from-orange-500/20 to-red-500/20 border-orange-500/40' : 'bg-gradient-to-br from-green-500/20 to-emerald-500/20 border-green-500/40'} border rounded-3xl p-8 shadow-2xl`}>
         <div className="flex items-start gap-4">
           <div className={`w-16 h-16 ${isPositive ? 'bg-gradient-to-br from-orange-500 to-red-500' : 'bg-gradient-to-br from-green-500 to-emerald-500'} rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg`}>
@@ -191,14 +184,14 @@ const StructuredMedicalReport = ({ reportText, prediction }) => {
             {isPositive ? 'Understanding Your Condition' : 'Understanding Your Results'}
           </h3>
         </div>
-        <div className="pl-0 md:pl-15 space-y-3">
+        <div className="space-y-3">
           <p className="text-white/90 leading-relaxed text-base">
             {sections.explanation || "Your health analysis is being processed. Please consult with your healthcare provider for detailed information."}
           </p>
         </div>
       </div>
 
-      {/* Health Tips - Title changes based on result */}
+      {/* Health Tips */}
       <div className={`backdrop-blur-xl ${isPositive ? 'bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-blue-500/30' : 'bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/30'} border rounded-2xl p-7 shadow-xl`}>
         <div className="flex items-center gap-3 mb-6">
           <div className={`w-12 h-12 ${isPositive ? 'bg-gradient-to-br from-blue-500 to-cyan-500' : 'bg-gradient-to-br from-green-500 to-emerald-500'} rounded-xl flex items-center justify-center shadow-lg`}>
@@ -283,7 +276,7 @@ const StructuredMedicalReport = ({ reportText, prediction }) => {
         </div>
       </div>
 
-      {/* Warning Signs / Symptoms to Monitor */}
+      {/* Warning Signs */}
       <div className={`backdrop-blur-xl ${isPositive ? 'bg-gradient-to-br from-red-500/20 to-pink-500/20 border-2 border-red-500/40' : 'bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border-2 border-yellow-500/40'} rounded-2xl p-7 shadow-2xl`}>
         <div className="flex items-center gap-3 mb-6">
           <div className={`w-12 h-12 ${isPositive ? 'bg-gradient-to-br from-red-500 to-pink-500' : 'bg-gradient-to-br from-yellow-500 to-orange-500'} rounded-xl flex items-center justify-center shadow-lg`}>
@@ -295,7 +288,7 @@ const StructuredMedicalReport = ({ reportText, prediction }) => {
             {isPositive ? '🚨 Emergency Warning Signs' : '👀 Symptoms to Monitor'}
           </h3>
         </div>
-        <p className="text-white/80 text-sm mb-5 pl-0 md:pl-15">
+        <p className="text-white/80 text-sm mb-5">
           {isPositive 
             ? "Seek IMMEDIATE medical attention if you experience any of these symptoms:"
             : "If you experience any of these symptoms in the future, schedule a medical consultation:"}
@@ -337,12 +330,12 @@ const StructuredMedicalReport = ({ reportText, prediction }) => {
 
 // Disease configurations
 const diseaseConfigs = {
-  pneumonia: {
-    id: "pneumonia",
-    name: "Pneumonia Detection",
+  kidney: {
+    id: "kidney",
+    name: "Kidney Disease Detection",
     type: "image",
-    category: "Respiratory",
-    apiEndpoint: "/api/predict/pneumonia",
+    category: "Urological",
+    apiEndpoint: "/api/predict/kidney",
     colors: {
       primary: "from-blue-500 via-cyan-500 to-teal-500",
       secondary: "bg-blue-500/10",
@@ -351,7 +344,7 @@ const diseaseConfigs = {
       buttonHover: "hover:shadow-blue-500/50",
       glow: "shadow-blue-500/30",
     },
-    icon: "🫁",
+    icon: "🫘",
     gradient: "bg-gradient-to-br from-blue-900/50 via-cyan-900/30 to-teal-900/50",
   },
   malaria: {
@@ -370,33 +363,6 @@ const diseaseConfigs = {
     },
     icon: "🔬",
     gradient: "bg-gradient-to-br from-orange-900/50 via-red-900/30 to-pink-900/50",
-  },
-  diabetes: {
-    id: "diabetes",
-    name: "Diabetes Risk Assessment",
-    type: "form",
-    category: "Metabolic",
-    apiEndpoint: "/api/predict/diabetes",
-    colors: {
-      primary: "from-green-500 via-emerald-500 to-teal-500",
-      secondary: "bg-green-500/10",
-      border: "border-green-500/30",
-      accent: "text-green-400",
-      buttonHover: "hover:shadow-green-500/50",
-      glow: "shadow-green-500/30",
-    },
-    icon: "💉",
-    gradient: "bg-gradient-to-br from-green-900/50 via-emerald-900/30 to-teal-900/50",
-    inputs: [
-      { name: "Pregnancies", label: "Number of Pregnancies", type: "number", placeholder: "e.g., 2", min: 0, max: 20 },
-      { name: "Glucose", label: "Glucose Level (mg/dL)", type: "number", placeholder: "e.g., 120", min: 0, max: 300 },
-      { name: "BloodPressure", label: "Blood Pressure (mmHg)", type: "number", placeholder: "e.g., 80", min: 0, max: 200 },
-      { name: "SkinThickness", label: "Skin Thickness (mm)", type: "number", placeholder: "e.g., 20", min: 0, max: 100 },
-      { name: "Insulin", label: "Insulin Level (μU/mL)", type: "number", placeholder: "e.g., 80", min: 0, max: 900 },
-      { name: "BMI", label: "BMI (kg/m²)", type: "number", placeholder: "e.g., 25.5", min: 0, max: 70, step: "0.1" },
-      { name: "DiabetesPedigreeFunction", label: "Diabetes Pedigree", type: "number", placeholder: "e.g., 0.5", min: 0, max: 3, step: "0.001" },
-      { name: "Age", label: "Age (years)", type: "number", placeholder: "e.g., 45", min: 1, max: 120 },
-    ],
   },
   depression: {
     id: "depression",
@@ -440,7 +406,7 @@ const CustomDropdown = ({ selectedDisease, onSelect }) => {
             <p className="text-white font-bold text-lg">{config.name}</p>
             <p className="text-white/60 text-sm mt-1 flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${config.colors.secondary} ${config.colors.border} border`}></span>
-              {config.category} • {config.type === "image" ? "Image" : config.type === "form" ? "Form" : "Text"}-based
+              {config.category} • {config.type === "image" ? "Image" : "Text"}-based
             </p>
           </div>
         </div>
@@ -523,7 +489,7 @@ const DetailedReport = ({ disease, result, geminiReport }) => {
         </div>
         <div className={`backdrop-blur-xl bg-white/5 border ${config.colors.border} rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 shadow-lg group`}>
           <p className={`${config.colors.accent} text-sm font-semibold mb-2 uppercase tracking-wider`}>Risk Level</p>
-          <p className={`text-3xl font-bold ${result.riskLevel === 'High' ? 'text-red-400' : result.riskLevel === 'Medium' ? 'text-yellow-400' : 'text-green-400'} group-hover:scale-105 transition-transform`}>
+          <p className={`text-3xl font-bold ${result.riskLevel === 'High' ? 'text-red-400' : result.riskLevel === 'Moderate' ? 'text-yellow-400' : 'text-green-400'} group-hover:scale-105 transition-transform`}>
             {result.riskLevel || 'Moderate'}
           </p>
         </div>
@@ -566,7 +532,7 @@ const DetailedReport = ({ disease, result, geminiReport }) => {
           </div>
           <div>
             <p className="text-white font-bold">AI-Powered Insights</p>
-            <p className="text-white/60 text-sm">Generated by Gemini 2.0 Flash</p>
+            <p className="text-white/60 text-sm">Generated by Gemini Pro</p>
           </div>
         </div>
         <button
@@ -599,10 +565,9 @@ const DetailedReport = ({ disease, result, geminiReport }) => {
 
 // Main Component
 export default function EnhancedDiseasePredictionDashboard() {
-  const [selectedDisease, setSelectedDisease] = useState("pneumonia");
+  const [selectedDisease, setSelectedDisease] = useState("kidney");
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [formData, setFormData] = useState({});
   const [textInput, setTextInput] = useState("");
   const [processing, setProcessing] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -611,7 +576,7 @@ export default function EnhancedDiseasePredictionDashboard() {
   const [generatingGemini, setGeneratingGemini] = useState(false);
 
   const config = diseaseConfigs[selectedDisease];
-  const API_BASE = "https://sympto-node.onrender.com";
+  const API_BASE = import.meta.env.VITE_BACKEND_URL || "https://sympto-node.onrender.com";
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -621,16 +586,11 @@ export default function EnhancedDiseasePredictionDashboard() {
     }
   };
 
-  const handleFormChange = (name, value) => {
-    setFormData(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
-  };
-
   const handleDiseaseChange = (diseaseId) => {
     setSelectedDisease(diseaseId);
     setShowReport(false);
     setImageFile(null);
     setImagePreview(null);
-    setFormData({});
     setTextInput("");
     setGeminiReport("");
   };
@@ -641,13 +601,11 @@ export default function EnhancedDiseasePredictionDashboard() {
         "Parasitized": `Malaria parasites detected with ${confidence}% confidence. Immediate medical consultation required.`,
         "Uninfected": `No malaria parasites detected. Blood smear appears normal (${confidence}% confidence).`
       },
-      pneumonia: {
-        "Pneumonia": `Pneumonia infection detected with ${confidence}% confidence. Consult pulmonologist immediately.`,
-        "Normal": `Chest X-ray appears clear with no signs of pneumonia (${confidence}% confidence).`
-      },
-      diabetes: {
-        "Diabetes": `High diabetes risk detected with ${confidence}% confidence. Consult endocrinologist for HbA1c testing.`,
-        "No Diabetes": `Low diabetes risk with ${confidence}% confidence. Maintain healthy lifestyle.`
+      kidney: {
+        "Cyst": `Kidney cyst detected with ${confidence}% confidence. Consult urologist for evaluation.`,
+        "Normal": `Kidney appears normal with ${confidence}% confidence.`,
+        "Stone": `Kidney stone detected with ${confidence}% confidence. Immediate urologist consultation recommended.`,
+        "Tumor": `Kidney tumor detected with ${confidence}% confidence. URGENT: Consult oncologist immediately.`
       },
       depression: {
         "Depressed": `Signs of depression detected with ${confidence}% confidence. Please consult a mental health professional.`,
@@ -672,19 +630,9 @@ export default function EnhancedDiseasePredictionDashboard() {
         }
         const fd = new FormData();
         fd.append('image', imageFile);
-        response = await fetch(`${API_BASE}${config.apiEndpoint}`, { method: 'POST', body: fd });
-      } else if (config.type === "form") {
-        const requiredFields = config.inputs.map(i => i.name);
-        const missing = requiredFields.filter(f => !formData[f]);
-        if (missing.length > 0) {
-          alert(`Please fill all fields: ${missing.join(', ')}`);
-          setProcessing(false);
-          return;
-        }
-        response = await fetch(`${API_BASE}${config.apiEndpoint}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+        response = await fetch(`${API_BASE}${config.apiEndpoint}`, { 
+          method: 'POST', 
+          body: fd 
         });
       } else if (config.type === "text") {
         if (!textInput.trim()) {
@@ -707,7 +655,7 @@ export default function EnhancedDiseasePredictionDashboard() {
           diagnosis: generateDiagnosis(selectedDisease, data.prediction, data.confidence),
           prediction: data.prediction,
           confidence: data.confidence,
-          riskLevel: data.risk_level || (data.confidence > 80 ? 'High' : data.confidence > 50 ? 'Medium' : 'Low'),
+          riskLevel: data.risk_level || (data.confidence > 80 ? 'High' : data.confidence > 50 ? 'Moderate' : 'Low'),
           probabilities: data.probabilities || null
         };
         
@@ -720,8 +668,7 @@ export default function EnhancedDiseasePredictionDashboard() {
           const geminiText = await generateGeminiReport(
             config.name,
             data.prediction,
-            data.confidence,
-            config.type === "form" ? formData : null
+            data.confidence
           );
           setGeminiReport(geminiText);
         } catch (geminiError) {
@@ -734,7 +681,7 @@ export default function EnhancedDiseasePredictionDashboard() {
       }
     } catch (error) {
       console.error('Prediction error:', error);
-      alert('Failed to connect to backend.');
+      alert('Failed to connect to backend. Error: ' + error.message);
     } finally {
       setProcessing(false);
     }
@@ -836,27 +783,6 @@ export default function EnhancedDiseasePredictionDashboard() {
                           </div>
                         )}
                       </label>
-                    </div>
-                  ) : config.type === "form" ? (
-                    <div className="grid md:grid-cols-2 gap-5">
-                      {config.inputs?.map((input) => (
-                        <div key={input.name} className="group">
-                          <label className="block text-sm font-semibold mb-3 text-white/80 group-hover:text-white transition-colors">
-                            {input.label}
-                          </label>
-                          <input
-                            type={input.type}
-                            placeholder={input.placeholder}
-                            min={input.min}
-                            max={input.max}
-                            step={input.step || "1"}
-                            value={formData[input.name] || ""}
-                            onChange={(e) => handleFormChange(input.name, e.target.value)}
-                            className="w-full backdrop-blur-xl bg-white/5 border border-white/20 rounded-xl px-5 py-4 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-300 hover:bg-white/10"
-                            required
-                          />
-                        </div>
-                      ))}
                     </div>
                   ) : config.type === "text" ? (
                     <div className="space-y-5">
