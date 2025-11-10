@@ -83,7 +83,7 @@ Use a positive, encouraging tone. This is a NEGATIVE diagnosis - celebrate the g
 
   try {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text() || "Unable to generate recommendations at this time.";
@@ -172,7 +172,7 @@ const StructuredMedicalReport = ({ reportText, prediction }) => {
         </div>
       </div>
 
-      {/* Understanding Your Condition/Results */}
+      {/* Understanding Section */}
       <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-7 shadow-xl hover:bg-white/10 transition-all duration-300">
         <div className="flex items-center gap-3 mb-5">
           <div className={`w-12 h-12 ${isPositive ? 'bg-gradient-to-br from-blue-500 to-cyan-500' : 'bg-gradient-to-br from-green-500 to-emerald-500'} rounded-xl flex items-center justify-center shadow-lg`}>
@@ -264,14 +264,6 @@ const StructuredMedicalReport = ({ reportText, prediction }) => {
                 ? "Schedule an immediate appointment with your healthcare provider for treatment planning and management."
                 : "Continue with regular health check-ups and maintain your healthy lifestyle to prevent disease.")}
             </p>
-            <div className="flex flex-wrap gap-3">
-              <button className={`px-6 py-3 ${isPositive ? 'bg-gradient-to-r from-red-500 to-pink-500 shadow-red-500/50' : 'bg-gradient-to-r from-cyan-500 to-blue-500 shadow-cyan-500/50'} text-white font-semibold rounded-xl shadow-lg hover:scale-105 transition-all duration-300`}>
-                {isPositive ? 'Schedule Urgent Appointment' : 'Schedule Check-up'}
-              </button>
-              <button className="px-6 py-3 backdrop-blur-xl bg-white/10 text-white font-semibold rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300">
-                Download Report
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -297,11 +289,11 @@ const StructuredMedicalReport = ({ reportText, prediction }) => {
           {(sections.warnings.length > 0 ? sections.warnings : [
             isPositive ? "Severe worsening of symptoms" : "Persistent unusual fatigue",
             isPositive ? "Difficulty breathing" : "Unexplained weight changes",
-            isPositive ? "Severe chest pain" : "Persistent fever or cough",
-            isPositive ? "Loss of consciousness" : "Unusual pain or discomfort",
-            isPositive ? "Sudden confusion" : "Any concerning new symptoms"
+            isPositive ? "Severe pain" : "Persistent fever",
+            isPositive ? "Loss of consciousness" : "Unusual pain",
+            isPositive ? "Sudden confusion" : "Any concerning symptoms"
           ]).map((warning, index) => (
-            <div key={index} className={`flex items-start gap-4 backdrop-blur-sm ${isPositive ? 'bg-red-500/10 border-red-500/20 hover:border-red-500/40' : 'bg-yellow-500/10 border-yellow-500/20 hover:border-yellow-500/40'} rounded-xl p-4 border transition-all duration-300`}>
+            <div key={index} className={`flex items-start gap-4 backdrop-blur-sm ${isPositive ? 'bg-red-500/10 border-red-500/20' : 'bg-yellow-500/10 border-yellow-500/20'} rounded-xl p-4 border transition-all duration-300`}>
               <svg className={`w-6 h-6 ${isPositive ? 'text-red-400' : 'text-yellow-400'} flex-shrink-0 mt-0.5`} fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
@@ -311,7 +303,7 @@ const StructuredMedicalReport = ({ reportText, prediction }) => {
         </div>
       </div>
 
-      {/* Footer Disclaimer */}
+      {/* Disclaimer */}
       <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 shadow-lg">
         <div className="flex items-start gap-3">
           <svg className="w-5 h-5 text-white/60 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -319,7 +311,7 @@ const StructuredMedicalReport = ({ reportText, prediction }) => {
           </svg>
           <div>
             <p className="text-white/70 text-sm leading-relaxed">
-              <strong className="text-white/90">Medical Disclaimer:</strong> This report is AI-generated for informational purposes only and does not replace professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare professionals regarding your health condition. In case of emergency, call your local emergency number immediately.
+              <strong className="text-white/90">Medical Disclaimer:</strong> This report is AI-generated for informational purposes only and does not replace professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare professionals regarding your health condition.
             </p>
           </div>
         </div>
@@ -453,10 +445,17 @@ const CustomDropdown = ({ selectedDisease, onSelect }) => {
   );
 };
 
-// Enhanced Report Component with Gemini Integration
+// Enhanced Report Component
 const DetailedReport = ({ disease, result, geminiReport }) => {
+  console.log('DetailedReport received:', { disease, result, geminiReport: !!geminiReport });
+  
   const config = diseaseConfigs[disease];
   const [showGemini, setShowGemini] = useState(true);
+
+  // Safety check
+  if (!result) {
+    return <div className="text-white">Loading report data...</div>;
+  }
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -477,26 +476,30 @@ const DetailedReport = ({ disease, result, geminiReport }) => {
         </div>
       </div>
 
-      {/* Key Metrics */}
+      {/* Key Metrics - FIXED */}
       <div className="grid md:grid-cols-3 gap-5">
         <div className={`backdrop-blur-xl bg-white/5 border ${config.colors.border} rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 shadow-lg group`}>
           <p className={`${config.colors.accent} text-sm font-semibold mb-2 uppercase tracking-wider`}>Prediction</p>
-          <p className="text-3xl font-bold text-white group-hover:scale-105 transition-transform">{result.prediction}</p>
+          <p className="text-3xl font-bold text-white group-hover:scale-105 transition-transform">
+            {result?.prediction || 'N/A'}
+          </p>
         </div>
         <div className={`backdrop-blur-xl bg-white/5 border ${config.colors.border} rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 shadow-lg group`}>
           <p className={`${config.colors.accent} text-sm font-semibold mb-2 uppercase tracking-wider`}>Confidence</p>
-          <p className="text-3xl font-bold text-white group-hover:scale-105 transition-transform">{result.confidence}%</p>
+          <p className="text-3xl font-bold text-white group-hover:scale-105 transition-transform">
+            {result?.confidence ? `${result.confidence}%` : 'N/A'}
+          </p>
         </div>
         <div className={`backdrop-blur-xl bg-white/5 border ${config.colors.border} rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 shadow-lg group`}>
           <p className={`${config.colors.accent} text-sm font-semibold mb-2 uppercase tracking-wider`}>Risk Level</p>
-          <p className={`text-3xl font-bold ${result.riskLevel === 'High' ? 'text-red-400' : result.riskLevel === 'Moderate' ? 'text-yellow-400' : 'text-green-400'} group-hover:scale-105 transition-transform`}>
-            {result.riskLevel || 'Moderate'}
+          <p className={`text-3xl font-bold ${result?.riskLevel === 'High' ? 'text-red-400' : result?.riskLevel === 'Moderate' ? 'text-yellow-400' : 'text-green-400'} group-hover:scale-105 transition-transform`}>
+            {result?.riskLevel || 'N/A'}
           </p>
         </div>
       </div>
 
       {/* Probabilities */}
-      {result.probabilities && (
+      {result?.probabilities && (
         <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-7 shadow-xl">
           <h3 className="text-xl font-bold text-white mb-5 flex items-center gap-3">
             <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
@@ -547,7 +550,7 @@ const DetailedReport = ({ disease, result, geminiReport }) => {
         </button>
       </div>
 
-      {/* Gemini Report with Structured Layout */}
+      {/* Gemini Report */}
       {showGemini && geminiReport && (
         <div className="backdrop-blur-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-2xl p-7 shadow-xl animate-slideIn">
           <div className="flex items-center gap-3 mb-5">
@@ -593,6 +596,7 @@ export default function EnhancedDiseasePredictionDashboard() {
     setImagePreview(null);
     setTextInput("");
     setGeminiReport("");
+    setReportData(null);
   };
 
   const generateDiagnosis = (diseaseId, prediction, confidence) => {
@@ -622,6 +626,8 @@ export default function EnhancedDiseasePredictionDashboard() {
     try {
       let response;
       
+      console.log(`[REACT] Making request to: ${API_BASE}${config.apiEndpoint}`);
+      
       if (config.type === "image") {
         if (!imageFile) {
           alert('Please upload an image first');
@@ -630,6 +636,7 @@ export default function EnhancedDiseasePredictionDashboard() {
         }
         const fd = new FormData();
         fd.append('image', imageFile);
+        console.log(`[REACT] Sending image for ${selectedDisease}`);
         response = await fetch(`${API_BASE}${config.apiEndpoint}`, { 
           method: 'POST', 
           body: fd 
@@ -640,6 +647,7 @@ export default function EnhancedDiseasePredictionDashboard() {
           setProcessing(false);
           return;
         }
+        console.log(`[REACT] Sending text for ${selectedDisease}`);
         response = await fetch(`${API_BASE}${config.apiEndpoint}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -648,9 +656,12 @@ export default function EnhancedDiseasePredictionDashboard() {
       }
 
       const result = await response.json();
+      console.log('[REACT] Full API response:', result);
 
       if (response.ok && result.success) {
         const data = result.data;
+        console.log('[REACT] Extracted data:', data);
+        
         const reportResult = {
           diagnosis: generateDiagnosis(selectedDisease, data.prediction, data.confidence),
           prediction: data.prediction,
@@ -659,28 +670,33 @@ export default function EnhancedDiseasePredictionDashboard() {
           probabilities: data.probabilities || null
         };
         
+        console.log('[REACT] Report object created:', reportResult);
+        
         setReportData(reportResult);
         setShowReport(true);
 
         // Generate Gemini Report
         setGeneratingGemini(true);
         try {
+          console.log(`[REACT] Generating Gemini report for ${config.name}...`);
           const geminiText = await generateGeminiReport(
             config.name,
             data.prediction,
             data.confidence
           );
           setGeminiReport(geminiText);
+          console.log('[REACT] Gemini report generated successfully');
         } catch (geminiError) {
-          console.error("Gemini generation failed:", geminiError);
+          console.error("[REACT] Gemini generation failed:", geminiError);
           setGeminiReport("Unable to generate AI insights at this time.");
         }
         setGeneratingGemini(false);
       } else {
+        console.error('[REACT] API Error:', result);
         alert('Error: ' + (result.error || 'Failed to get prediction'));
       }
     } catch (error) {
-      console.error('Prediction error:', error);
+      console.error('[REACT] Request failed:', error);
       alert('Failed to connect to backend. Error: ' + error.message);
     } finally {
       setProcessing(false);
@@ -843,7 +859,11 @@ export default function EnhancedDiseasePredictionDashboard() {
           ) : (
             <div>
               <button 
-                onClick={() => setShowReport(false)} 
+                onClick={() => {
+                  setShowReport(false);
+                  setReportData(null);
+                  setGeminiReport("");
+                }} 
                 className="mb-8 flex items-center gap-3 text-white/60 hover:text-white transition-all duration-300 group backdrop-blur-xl bg-white/5 px-6 py-3 rounded-xl border border-white/10 hover:border-white/30"
               >
                 <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
