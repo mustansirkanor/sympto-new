@@ -611,7 +611,7 @@ export default function EnhancedDiseasePredictionDashboard() {
   const [generatingGemini, setGeneratingGemini] = useState(false);
 
   const config = diseaseConfigs[selectedDisease];
-  const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+  const API_BASE = "https://sympto-node.onrender.com";
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
