@@ -45,7 +45,7 @@ async def keep_alive():
 async def startup_event():
     asyncio.create_task(keep_alive())
     print(f"🚀 Self-ping activated: {RENDER_URL}")
-    print("⚡ Models will be loaded on-demand to save memory")
+    print("⚡ Models will swap on-demand to save memory")
 
 # ========== MEMORY CLEANUP ==========
 def cleanup_memory():
@@ -54,6 +54,38 @@ def cleanup_memory():
         print("✓ Memory cleaned successfully")
     except Exception as e:
         print(f"✗ Memory cleanup warning: {e}")
+
+# ========== UNLOAD MODEL FUNCTION ==========
+def unload_model(model_name):
+    """Unload specific model from memory"""
+    global malaria_model, kidney_model, depression_model, depression_vectorizer
+    
+    if model_name == "malaria" and malaria_model is not None:
+        print("[MEMORY] Unloading Malaria model...")
+        del malaria_model
+        malaria_model = None
+        tf.keras.backend.clear_session()
+        gc.collect()
+        print("✓ Malaria model unloaded")
+    
+    elif model_name == "kidney" and kidney_model is not None:
+        print("[MEMORY] Unloading Kidney model...")
+        del kidney_model
+        kidney_model = None
+        tf.keras.backend.clear_session()
+        gc.collect()
+        print("✓ Kidney model unloaded")
+    
+    elif model_name == "depression" and (depression_model is not None or depression_vectorizer is not None):
+        print("[MEMORY] Unloading Depression model...")
+        if depression_model is not None:
+            del depression_model
+            depression_model = None
+        if depression_vectorizer is not None:
+            del depression_vectorizer
+            depression_vectorizer = None
+        gc.collect()
+        print("✓ Depression model unloaded")
 
 # ========== TEXT CLEANING ==========
 def clean_text(text):
@@ -78,16 +110,20 @@ def preprocess_kidney(img: Image.Image):
     arr = tf.keras.applications.inception_v3.preprocess_input(arr)
     return np.expand_dims(arr, axis=0)
 
-# ========== LAZY LOADED MODEL VARIABLES ==========
+# ========== MODEL VARIABLES ==========
 malaria_model = None
 kidney_model = None
 depression_model = None
 depression_vectorizer = None
 
-# ========== LAZY LOAD FUNCTIONS ==========
+# ========== SMART LOAD FUNCTIONS (WITH AUTO-UNLOAD) ==========
 def load_malaria_model():
     global malaria_model
     if malaria_model is None:
+        # Unload other models first
+        unload_model("kidney")
+        unload_model("depression")
+        
         print("[MALARIA] Loading model...")
         base = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights=None)
         base.trainable = False
@@ -107,6 +143,10 @@ def load_malaria_model():
 def load_kidney_model():
     global kidney_model
     if kidney_model is None:
+        # Unload other models first
+        unload_model("malaria")
+        unload_model("depression")
+        
         print("[KIDNEY] Loading model...")
         kidney_model = keras.models.load_model(
             "../models/final_inceptionv3_kidney_finetuned.h5",
@@ -118,6 +158,10 @@ def load_kidney_model():
 def load_depression_model():
     global depression_model, depression_vectorizer
     if depression_model is None:
+        # Unload other models first
+        unload_model("malaria")
+        unload_model("kidney")
+        
         print("[DEPRESSION] Loading model...")
         with open("../models/depression_detection_model.pkl", "rb") as f:
             depression_model = pickle.load(f)
@@ -137,6 +181,7 @@ def home():
         "message": "Disease Prediction API",
         "status": "running",
         "memory_optimized": True,
+        "strategy": "model_swapping",
     }
 
 @app.post("/api/predict/malaria")
