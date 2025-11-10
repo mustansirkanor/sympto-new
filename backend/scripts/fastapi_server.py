@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from PIL import Image
@@ -6,6 +6,10 @@ import numpy as np
 import pickle
 import io
 import re
+import gc
+import asyncio
+import httpx
+import os
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.applications import MobileNetV2, InceptionV3
@@ -22,6 +26,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ========== SELF-PING CONFIGURATION ==========
+RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "https://sympto-new-model.onrender.com")
+PING_INTERVAL = 720  # 14 minutes in seconds
+
+async def keep_alive():
+    """Background task to ping the server every 14 minutes"""
+    while True:
+        try:
+            await asyncio.sleep(PING_INTERVAL)
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(f"{RENDER_URL}/")
+                print(f"✓ Self-ping successful at {response.status_code}")
+        except Exception as e:
+            print(f"✗ Self-ping failed: {e}")
+
+@app.on_event("startup")
+async def startup_event():
+    """Start the self-ping background task on app startup"""
+    asyncio.create_task(keep_alive())
+    print(f"🚀 Self-ping activated: {RENDER_URL}")
+
+# ========== MEMORY CLEANUP FUNCTION ==========
+def cleanup_memory():
+    """Clear TensorFlow session and run garbage collection"""
+    try:
+        # Clear TensorFlow/Keras backend session
+        tf.keras.backend.clear_session()
+        
+        # Force garbage collection
+        gc.collect()
+        
+        print("✓ Memory cleaned successfully")
+    except Exception as e:
+        print(f"✗ Memory cleanup warning: {e}")
 
 # ========== TEXT CLEANING ==========
 def clean_text(text):
@@ -121,7 +160,7 @@ def home():
     }
 
 @app.post("/api/predict/malaria")
-async def predict_malaria(image: UploadFile = File(...)):
+async def predict_malaria(image: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     print("\n[MALARIA] Received prediction request")
     
     if malaria_model is None:
@@ -152,6 +191,10 @@ async def predict_malaria(image: UploadFile = File(...)):
         
         print(f"[MALARIA] Final: {label} ({conf:.2f}%)")
         
+        # Schedule memory cleanup as background task
+        if background_tasks:
+            background_tasks.add_task(cleanup_memory)
+        
         return {
             "success": True,
             "data": {
@@ -166,10 +209,12 @@ async def predict_malaria(image: UploadFile = File(...)):
         }
     except Exception as e:
         print(f"[MALARIA] ERROR: {str(e)}")
+        if background_tasks:
+            background_tasks.add_task(cleanup_memory)
         raise HTTPException(400, str(e))
 
 @app.post("/api/predict/kidney")
-async def predict_kidney(image: UploadFile = File(...)):
+async def predict_kidney(image: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     print("\n[KIDNEY] Received prediction request")
     
     if kidney_model is None:
@@ -208,6 +253,10 @@ async def predict_kidney(image: UploadFile = File(...)):
             for i in range(len(class_names))
         }
         
+        # Schedule memory cleanup as background task
+        if background_tasks:
+            background_tasks.add_task(cleanup_memory)
+        
         return {
             "success": True,
             "data": {
@@ -219,10 +268,12 @@ async def predict_kidney(image: UploadFile = File(...)):
         }
     except Exception as e:
         print(f"[KIDNEY] ERROR: {str(e)}")
+        if background_tasks:
+            background_tasks.add_task(cleanup_memory)
         raise HTTPException(400, str(e))
 
 @app.post("/api/predict/depression")
-async def predict_depression(data: DepressionInput):
+async def predict_depression(data: DepressionInput, background_tasks: BackgroundTasks = None):
     print("\n[DEPRESSION] Received prediction request")
     print(f"[DEPRESSION] Text: {data.text[:50]}...")
     
@@ -257,6 +308,10 @@ async def predict_depression(data: DepressionInput):
         
         print(f"[DEPRESSION] Final: {label} ({conf:.2f}%)")
         
+        # Schedule memory cleanup as background task
+        if background_tasks:
+            background_tasks.add_task(cleanup_memory)
+        
         return {
             "success": True,
             "data": {
@@ -271,6 +326,8 @@ async def predict_depression(data: DepressionInput):
         }
     except Exception as e:
         print(f"[DEPRESSION] ERROR: {str(e)}")
+        if background_tasks:
+            background_tasks.add_task(cleanup_memory)
         raise HTTPException(400, str(e))
 
 if __name__ == "__main__":

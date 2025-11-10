@@ -11,6 +11,20 @@ const PORT = process.env.PORT || 5000;
 const FASTAPI_URL = process.env.FASTAPI_URL || 'http://localhost:8000';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
+const url = 'https://sympto-node.onrender.com'; // Your Render URL
+
+function reloadWebsite() {
+  axios.get(url)
+    .then(response => {
+      console.log(`Reloaded at ${new Date().toISOString()}`);
+    })
+    .catch(error => {
+      console.error(`Error:`, error.message);
+    });
+}
+
+setInterval(reloadWebsite, 720000); // Ping every 14 minutes
+
 // Middleware
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
 app.use(express.json());
