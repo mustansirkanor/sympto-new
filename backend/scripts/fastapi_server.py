@@ -29,10 +29,9 @@ app.add_middleware(
 
 # ========== SELF-PING CONFIGURATION ==========
 RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "https://sympto-new-model.onrender.com")
-PING_INTERVAL = 720  # 14 minutes in seconds
+PING_INTERVAL = 840
 
 async def keep_alive():
-    """Background task to ping the server every 14 minutes"""
     while True:
         try:
             await asyncio.sleep(PING_INTERVAL)
@@ -44,20 +43,14 @@ async def keep_alive():
 
 @app.on_event("startup")
 async def startup_event():
-    """Start the self-ping background task on app startup"""
     asyncio.create_task(keep_alive())
     print(f"🚀 Self-ping activated: {RENDER_URL}")
+    print("⚡ Models will be loaded on-demand to save memory")
 
-# ========== MEMORY CLEANUP FUNCTION ==========
+# ========== MEMORY CLEANUP ==========
 def cleanup_memory():
-    """Clear TensorFlow session and run garbage collection"""
     try:
-        # Clear TensorFlow/Keras backend session
-        tf.keras.backend.clear_session()
-        
-        # Force garbage collection
         gc.collect()
-        
         print("✓ Memory cleaned successfully")
     except Exception as e:
         print(f"✗ Memory cleanup warning: {e}")
@@ -75,72 +68,63 @@ def to_rgb(img: Image.Image) -> Image.Image:
     return img if img.mode == "RGB" else img.convert("RGB")
 
 def preprocess_malaria(img: Image.Image):
-    """Malaria: 128x128 RGB, scale /255"""
     img = to_rgb(img).resize((128, 128))
     arr = np.array(img, dtype=np.float32) / 255.0
     return np.expand_dims(arr, axis=0)
 
 def preprocess_kidney(img: Image.Image):
-    """Kidney: 299x299 RGB, InceptionV3 preprocessing"""
     img = to_rgb(img).resize((299, 299))
     arr = np.array(img, dtype=np.float32)
     arr = tf.keras.applications.inception_v3.preprocess_input(arr)
     return np.expand_dims(arr, axis=0)
 
-# ========== GLOBAL MODEL VARIABLES ==========
+# ========== LAZY LOADED MODEL VARIABLES ==========
 malaria_model = None
 kidney_model = None
 depression_model = None
 depression_vectorizer = None
 
-# ========== LOAD MODELS ==========
-print("\n" + "="*60)
-print("Loading ML Models...")
-print("="*60)
+# ========== LAZY LOAD FUNCTIONS ==========
+def load_malaria_model():
+    global malaria_model
+    if malaria_model is None:
+        print("[MALARIA] Loading model...")
+        base = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights=None)
+        base.trainable = False
+        malaria_model = keras.Sequential([
+            base,
+            layers.GlobalAveragePooling2D(),
+            layers.Dropout(0.5),
+            layers.Dense(128, activation="relu"),
+            layers.Dropout(0.3),
+            layers.Dense(1, activation="sigmoid"),
+        ])
+        malaria_model.build((None, 128, 128, 3))
+        malaria_model.load_weights("../models/malaria_mobilenetv2_model.keras")
+        print("✓ Malaria model loaded")
+    return malaria_model
 
-# Load Malaria Model
-try:
-    base = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights=None)
-    base.trainable = False
-    malaria_model = keras.Sequential([
-        base,
-        layers.GlobalAveragePooling2D(),
-        layers.Dropout(0.5),
-        layers.Dense(128, activation="relu"),
-        layers.Dropout(0.3),
-        layers.Dense(1, activation="sigmoid"),
-    ])
-    malaria_model.build((None, 128, 128, 3))
-    malaria_model.load_weights("../models/malaria_mobilenetv2_model.keras")
-    print("✓ Malaria model loaded successfully")
-except Exception as e:
-    print(f"✗ Malaria model FAILED: {e}")
-    malaria_model = None
+def load_kidney_model():
+    global kidney_model
+    if kidney_model is None:
+        print("[KIDNEY] Loading model...")
+        kidney_model = keras.models.load_model(
+            "../models/final_inceptionv3_kidney_finetuned.h5",
+            compile=False
+        )
+        print("✓ Kidney model loaded")
+    return kidney_model
 
-# Load Kidney Model
-try:
-    kidney_model = keras.models.load_model(
-        "../models/final_inceptionv3_kidney_finetuned.h5",
-        compile=False
-    )
-    print("✓ Kidney model loaded successfully")
-except Exception as e:
-    print(f"✗ Kidney model FAILED: {e}")
-    kidney_model = None
-
-# Load Depression Model
-try:
-    with open("../models/depression_detection_model.pkl", "rb") as f:
-        depression_model = pickle.load(f)
-    with open("../models/tfidf_vectorizer.pkl", "rb") as f:
-        depression_vectorizer = pickle.load(f)
-    print("✓ Depression model loaded successfully")
-except Exception as e:
-    print(f"✗ Depression model FAILED: {e}")
-    depression_model = None
-    depression_vectorizer = None
-
-print("="*60 + "\n")
+def load_depression_model():
+    global depression_model, depression_vectorizer
+    if depression_model is None:
+        print("[DEPRESSION] Loading model...")
+        with open("../models/depression_detection_model.pkl", "rb") as f:
+            depression_model = pickle.load(f)
+        with open("../models/tfidf_vectorizer.pkl", "rb") as f:
+            depression_vectorizer = pickle.load(f)
+        print("✓ Depression model loaded")
+    return depression_model, depression_vectorizer
 
 # ========== PYDANTIC MODELS ==========
 class DepressionInput(BaseModel):
@@ -152,34 +136,23 @@ def home():
     return {
         "message": "Disease Prediction API",
         "status": "running",
-        "models": {
-            "malaria": malaria_model is not None,
-            "kidney": kidney_model is not None,
-            "depression": depression_model is not None,
-        },
+        "memory_optimized": True,
     }
 
 @app.post("/api/predict/malaria")
 async def predict_malaria(image: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     print("\n[MALARIA] Received prediction request")
     
-    if malaria_model is None:
-        raise HTTPException(500, "Malaria model not loaded")
-    
     try:
-        # Read and preprocess image
+        model = load_malaria_model()
+        
         img = Image.open(io.BytesIO(await image.read()))
         print(f"[MALARIA] Image size: {img.size}, mode: {img.mode}")
         
         x = preprocess_malaria(img)
-        print(f"[MALARIA] Preprocessed shape: {x.shape}")
-        
-        # Make prediction
-        y = malaria_model.predict(x, verbose=0)
+        y = model.predict(x, verbose=0)
         p = float(y[0][0])
-        print(f"[MALARIA] Raw prediction: {p}")
         
-        # Determine label and confidence
         if p >= 0.5:
             label = "Uninfected"
             conf = p * 100
@@ -191,7 +164,6 @@ async def predict_malaria(image: UploadFile = File(...), background_tasks: Backg
         
         print(f"[MALARIA] Final: {label} ({conf:.2f}%)")
         
-        # Schedule memory cleanup as background task
         if background_tasks:
             background_tasks.add_task(cleanup_memory)
         
@@ -217,22 +189,15 @@ async def predict_malaria(image: UploadFile = File(...), background_tasks: Backg
 async def predict_kidney(image: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     print("\n[KIDNEY] Received prediction request")
     
-    if kidney_model is None:
-        raise HTTPException(500, "Kidney model not loaded")
-    
     try:
-        # Read and preprocess image
+        model = load_kidney_model()
+        
         img = Image.open(io.BytesIO(await image.read()))
         print(f"[KIDNEY] Image size: {img.size}, mode: {img.mode}")
         
         x = preprocess_kidney(img)
-        print(f"[KIDNEY] Preprocessed shape: {x.shape}")
+        y = model.predict(x, verbose=0)[0]
         
-        # Make prediction
-        y = kidney_model.predict(x, verbose=0)[0]
-        print(f"[KIDNEY] Raw predictions: {y}")
-        
-        # Class names
         class_names = ["Cyst", "Normal", "Stone", "Tumor"]
         predicted_idx = int(np.argmax(y))
         label = class_names[predicted_idx]
@@ -240,12 +205,11 @@ async def predict_kidney(image: UploadFile = File(...), background_tasks: Backgr
         
         print(f"[KIDNEY] Final: {label} ({conf:.2f}%)")
         
-        # Risk level
         if label == "Normal":
             risk = "Low"
         elif label in ["Cyst", "Stone"]:
             risk = "Moderate" if conf > 70 else "High"
-        else:  # Tumor
+        else:
             risk = "High"
         
         probabilities = {
@@ -253,7 +217,6 @@ async def predict_kidney(image: UploadFile = File(...), background_tasks: Backgr
             for i in range(len(class_names))
         }
         
-        # Schedule memory cleanup as background task
         if background_tasks:
             background_tasks.add_task(cleanup_memory)
         
@@ -275,28 +238,20 @@ async def predict_kidney(image: UploadFile = File(...), background_tasks: Backgr
 @app.post("/api/predict/depression")
 async def predict_depression(data: DepressionInput, background_tasks: BackgroundTasks = None):
     print("\n[DEPRESSION] Received prediction request")
-    print(f"[DEPRESSION] Text: {data.text[:50]}...")
-    
-    if depression_model is None or depression_vectorizer is None:
-        raise HTTPException(500, "Depression model not loaded")
     
     try:
-        # Clean text
+        model, vectorizer = load_depression_model()
+        
         cleaned_text = clean_text(data.text)
         print(f"[DEPRESSION] Cleaned text: {cleaned_text[:50]}...")
         
         if not cleaned_text.strip():
             raise HTTPException(400, "Text input is empty after cleaning")
         
-        # Vectorize and predict
-        text_vector = depression_vectorizer.transform([cleaned_text])
-        prediction = depression_model.predict(text_vector)[0]
-        probability = depression_model.predict_proba(text_vector)[0]
+        text_vector = vectorizer.transform([cleaned_text])
+        prediction = model.predict(text_vector)[0]
+        probability = model.predict_proba(text_vector)[0]
         
-        print(f"[DEPRESSION] Raw prediction: {prediction}")
-        print(f"[DEPRESSION] Probabilities: {probability}")
-        
-        # Determine label
         label = "Depressed" if prediction == "depressed" else "Non-Depressed"
         
         if prediction == "depressed":
@@ -308,7 +263,6 @@ async def predict_depression(data: DepressionInput, background_tasks: Background
         
         print(f"[DEPRESSION] Final: {label} ({conf:.2f}%)")
         
-        # Schedule memory cleanup as background task
         if background_tasks:
             background_tasks.add_task(cleanup_memory)
         
