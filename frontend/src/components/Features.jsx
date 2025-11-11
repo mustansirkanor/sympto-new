@@ -91,7 +91,7 @@ export default function Features() {
         ref={headingRef}
         className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-[#0a0f1a] via-[#0a0f1a] to-transparent pt-8 pb-12 text-center pointer-events-none"
       >
-        <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight">
+        <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight mt-7">
           Features of SymptoScan
         </h2>
       </div>
