@@ -73,7 +73,7 @@ router.post('/malaria', optionalAuth, upload.single('image'), async (req, res) =
 
   try {
     // Forward to FastAPI
-    const data = await forwardImage(
+    const fastApiResponse = await forwardImage(
       '/api/predict/malaria',
       req.file.path,
       req.file.originalname,
@@ -84,9 +84,19 @@ router.post('/malaria', optionalAuth, upload.single('image'), async (req, res) =
     fs.unlinkSync(req.file.path);
     console.log(`[NODE] /api/predict/malaria - Cleaned up temp file`);
 
-    // Send response
-    console.log(`[NODE] /api/predict/malaria - Sending response to client`);
-    res.json(data);
+    // Transform response to match frontend expectations
+    // FastAPI returns: { success: true, data: { prediction, confidence, risk_level, probabilities } }
+    // Frontend expects: { success: true, prediction, confidence, riskLevel, probabilities }
+    const transformedResponse = {
+      success: true,
+      prediction: fastApiResponse.data.prediction,
+      confidence: fastApiResponse.data.confidence,
+      riskLevel: fastApiResponse.data.risk_level, // Convert snake_case to camelCase
+      probabilities: fastApiResponse.data.probabilities
+    };
+
+    console.log(`[NODE] /api/predict/malaria - Sending transformed response:`, transformedResponse);
+    res.json(transformedResponse);
   } catch (error) {
     // Clean up file on error
     if (req.file && fs.existsSync(req.file.path)) {
@@ -121,7 +131,7 @@ router.post('/kidney', optionalAuth, upload.single('image'), async (req, res) =>
 
   try {
     // Forward to FastAPI
-    const data = await forwardImage(
+    const fastApiResponse = await forwardImage(
       '/api/predict/kidney',
       req.file.path,
       req.file.originalname,
@@ -132,9 +142,19 @@ router.post('/kidney', optionalAuth, upload.single('image'), async (req, res) =>
     fs.unlinkSync(req.file.path);
     console.log(`[NODE] /api/predict/kidney - Cleaned up temp file`);
 
-    // Send response
-    console.log(`[NODE] /api/predict/kidney - Sending response to client`);
-    res.json(data);
+    // Transform response to match frontend expectations
+    // FastAPI returns: { success: true, data: { prediction, confidence, risk_level, probabilities } }
+    // Frontend expects: { success: true, prediction, confidence, riskLevel, probabilities }
+    const transformedResponse = {
+      success: true,
+      prediction: fastApiResponse.data.prediction,
+      confidence: fastApiResponse.data.confidence,
+      riskLevel: fastApiResponse.data.risk_level, // Convert snake_case to camelCase
+      probabilities: fastApiResponse.data.probabilities
+    };
+
+    console.log(`[NODE] /api/predict/kidney - Sending transformed response:`, transformedResponse);
+    res.json(transformedResponse);
   } catch (error) {
     // Clean up file on error
     if (req.file && fs.existsSync(req.file.path)) {
@@ -179,10 +199,21 @@ router.post('/depression', optionalAuth, async (req, res) => {
     );
 
     console.log(`[NODE] /api/predict/depression - Received response from FastAPI`);
-    console.log(`[NODE] /api/predict/depression - Response:`, response.data);
+    console.log(`[NODE] /api/predict/depression - Raw response:`, response.data);
 
-    // Send response
-    res.json(response.data);
+    // Transform response to match frontend expectations
+    // FastAPI returns: { success: true, data: { prediction, confidence, risk_level, probabilities } }
+    // Frontend expects: { success: true, prediction, confidence, riskLevel, probabilities }
+    const transformedResponse = {
+      success: true,
+      prediction: response.data.data.prediction,
+      confidence: response.data.data.confidence,
+      riskLevel: response.data.data.risk_level, // Convert snake_case to camelCase
+      probabilities: response.data.data.probabilities
+    };
+
+    console.log(`[NODE] /api/predict/depression - Sending transformed response:`, transformedResponse);
+    res.json(transformedResponse);
   } catch (error) {
     console.error(`[NODE] /api/predict/depression - Error:`, error.message);
 

@@ -25,10 +25,10 @@ function reloadWebsite() {
 
 setInterval(reloadWebsite, 720000); // Ping every 12 minutes
 
-// Middleware
+// ⚠️ CRITICAL: Middleware order matters! Place these BEFORE routes
 app.use(cors({ origin: FRONTEND_URL, credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' })); // Increased limit for PDF base64
+app.use(express.urlencoded({ extended: true, limit: '50mb' })); // Increased limit
 
 // Connect to MongoDB
 mongoose.connect(MONGODB_URI, {
@@ -47,6 +47,7 @@ mongoose.connect(MONGODB_URI, {
 // Import routes
 const authRoutes = require('./routes/auth');
 const predictionRoutes = require('./routes/prediction');
+const reportsRoutes = require('./routes/reports');
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -65,7 +66,12 @@ app.get('/', (req, res) => {
       // Prediction endpoints
       malaria: 'POST /api/predict/malaria',
       kidney: 'POST /api/predict/kidney',
-      depression: 'POST /api/predict/depression'
+      depression: 'POST /api/predict/depression',
+      // Reports endpoints
+      saveReport: 'POST /api/reports/save',
+      getReports: 'GET /api/reports',
+      getReport: 'GET /api/reports/:id',
+      deleteReport: 'DELETE /api/reports/:id'
     }
   });
 });
@@ -99,29 +105,12 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// Register routes
+// Register routes - ORDER MATTERS!
 app.use('/api/auth', authRoutes);
 app.use('/api/predict', predictionRoutes);
+app.use('/api/reports', reportsRoutes);
 
-// Global error handling middleware
-app.use((err, req, res, next) => {
-  console.error('[NODE] Server error:', err.message);
-  
-  // Multer file size error
-  if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(413).json({
-      success: false,
-      error: 'File too large. Maximum size is 10MB'
-    });
-  }
-  
-  res.status(500).json({
-    success: false,
-    error: err.message || 'Internal server error'
-  });
-});
-
-// 404 handler
+// 404 handler - must come BEFORE error handler
 app.use((req, res) => {
   console.warn(`[NODE] 404 - ${req.method} ${req.path}`);
   res.status(404).json({
@@ -139,8 +128,74 @@ app.use((req, res) => {
       'PUT /api/auth/change-password',
       'POST /api/predict/malaria',
       'POST /api/predict/kidney',
-      'POST /api/predict/depression'
+      'POST /api/predict/depression',
+      'POST /api/reports/save',
+      'GET /api/reports',
+      'GET /api/reports/:id',
+      'DELETE /api/reports/:id'
     ]
+  });
+});
+
+// Global error handling middleware - MUST BE LAST
+app.use((err, req, res, next) => {
+  console.error('[NODE] Server error:', err.message);
+  console.error('Stack:', err.stack);
+  
+  // Multer file size error
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({
+      success: false,
+      error: 'File too large. Maximum size is 10MB'
+    });
+  }
+
+  // Body parser payload too large error
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({
+      success: false,
+      error: 'Request payload too large. Maximum size is 50MB'
+    });
+  }
+
+  // MongoDB validation errors
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation error',
+      details: Object.values(err.errors).map(e => e.message)
+    });
+  }
+
+  // MongoDB duplicate key error
+  if (err.code === 11000) {
+    return res.status(409).json({
+      success: false,
+      error: 'Duplicate entry',
+      field: Object.keys(err.keyPattern)[0]
+    });
+  }
+
+  // JWT errors
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid token'
+    });
+  }
+
+  if (err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      error: 'Token expired'
+    });
+  }
+  
+  // Default error response
+  res.status(err.status || 500).json({
+    success: false,
+    error: err.message || 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 });
 
@@ -166,8 +221,14 @@ app.listen(PORT, () => {
   console.log(`  ✓ POST /api/predict/malaria            - Malaria Detection`);
   console.log(`  ✓ POST /api/predict/kidney             - Kidney Disease Detection`);
   console.log(`  ✓ POST /api/predict/depression         - Depression Detection`);
+  console.log(`\n📋 Medical Reports:`);
+  console.log(`  ✓ POST /api/reports/save               - Save Report (Protected)`);
+  console.log(`  ✓ GET  /api/reports                    - Get All Reports (Protected)`);
+  console.log(`  ✓ GET  /api/reports/:id                - Get Report by ID (Protected)`);
+  console.log(`  ✓ DELETE /api/reports/:id              - Delete Report (Protected)`);
   console.log('\n📦 Configuration:');
-  console.log(`  • Max file size:   10 MB`);
+  console.log(`  • Max file size:   10 MB (images)`);
+  console.log(`  • Max body size:   50 MB (JSON/PDFs)`);
   console.log(`  • Allowed types:   JPEG, JPG, PNG`);
   console.log(`  • Request timeout: 30 seconds`);
   console.log(`  • JWT expiry:      ${process.env.JWT_EXPIRE || '7 days'}`);

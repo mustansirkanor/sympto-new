@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../context/AuthContext";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -12,17 +12,19 @@ const Navbar = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate("/");
   };
 
   // Get user initials from full name
   const getInitials = (name) => {
-    if (!name) return 'U';
-    const names = name.trim().split(' ');
+    if (!name) return "U";
+    const names = name.trim().split(" ");
     if (names.length === 1) {
       return names[0].charAt(0).toUpperCase();
     }
-    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
+    return (
+      names[0].charAt(0) + names[names.length - 1].charAt(0)
+    ).toUpperCase();
   };
 
   // Close dropdown when clicking outside
@@ -33,9 +35,9 @@ const Navbar = () => {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -45,15 +47,13 @@ const Navbar = () => {
   }
 
   return (
-    <nav className="bg-gray-900/95 backdrop-blur-md shadow-lg fixed w-full z-50">
+    <nav className="bg-gray-900/95 backdrop-blur-md shadow-lg fixed w-full z-50 mb-5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex-shrink-0">
             <Link to="/Dashboard" className="flex items-center">
-              <span className="text-2xl font-bold text-white">
-                Health<span className="text-blue-500">AI</span>
-              </span>
+              <span className="text-2xl font-bold text-white">SymptoScan</span>
             </Link>
           </div>
 
@@ -78,6 +78,12 @@ const Navbar = () => {
               >
                 AI Assistant
               </Link>
+              <Link
+                to="/reports"
+                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+              >
+                My Reports
+              </Link>
 
               {/* User Profile Dropdown */}
               <div className="ml-4 relative" ref={dropdownRef}>
@@ -91,11 +97,11 @@ const Navbar = () => {
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-lg">
                     {getInitials(user?.fullName)}
                   </div>
-                  
+
                   {/* Dropdown Arrow */}
                   <svg
                     className={`w-4 h-4 text-gray-300 transition-transform duration-200 ${
-                      isDropdownOpen ? 'rotate-180' : ''
+                      isDropdownOpen ? "rotate-180" : ""
                     }`}
                     fill="none"
                     viewBox="0 0 24 24"
@@ -128,10 +134,10 @@ const Navbar = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-white truncate">
-                              {user?.fullName || 'User'}
+                              {user?.fullName || "User"}
                             </p>
                             <p className="text-xs text-gray-400 truncate">
-                              {user?.email || 'user@example.com'}
+                              {user?.email || "user@example.com"}
                             </p>
                           </div>
                         </div>
@@ -304,7 +310,7 @@ const Navbar = () => {
             >
               AI Assistant
             </Link>
-            
+
             {/* Mobile User Profile Section */}
             <div className="border-t border-gray-700 mt-4 pt-4">
               <div className="flex items-center px-3 mb-3">
@@ -313,10 +319,10 @@ const Navbar = () => {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm font-semibold text-white">
-                    {user?.fullName || 'User'}
+                    {user?.fullName || "User"}
                   </p>
                   <p className="text-xs text-gray-400">
-                    {user?.email || 'user@example.com'}
+                    {user?.email || "user@example.com"}
                   </p>
                 </div>
               </div>
@@ -342,7 +348,7 @@ const Navbar = () => {
               >
                 Help & Support
               </Link>
-              
+
               <button
                 onClick={() => {
                   setIsOpen(false);
