@@ -16,7 +16,7 @@ export default function App() {
   return (
     <Router>
       <AuthProvider>
-        <Navbar />
+        <Navbar/>
         <div className="bg-dark-bg min-h-screen">
           <Routes>
             {/* Public Routes */}
@@ -27,11 +27,13 @@ export default function App() {
               path="/Dashboard"
               element={
                 <ProtectedRoute>
+                  <div key="Dashboard-mustan">
                   <HeroSection />
                   <AboutSection />
                   <Features />
                   <HowItWorks />
                   <Footer />
+                  </div>
                 </ProtectedRoute>
               }
             />
