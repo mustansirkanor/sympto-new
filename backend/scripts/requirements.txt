@@ -6,3 +6,4 @@ numpy
 tensorflow
 scikit-learn==1.3.2
 httpx
+psutil==5.9.6
