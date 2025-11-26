@@ -69,31 +69,31 @@ const ReportsHistory = () => {
     }
   };
 
-  const handleDownloadPDF = async (report) => {
-    try {
-      if (report.pdfData) {
-        // Convert base64 to blob and download
-        const base64 = report.pdfData.split(',')[1];
-        const binary = atob(base64);
-        const array = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          array[i] = binary.charCodeAt(i);
-        }
-        const blob = new Blob([array], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
+  // const handleDownloadPDF = async (report) => {
+  //   try {
+  //     if (report.pdfData) {
+  //       // Convert base64 to blob and download
+  //       const base64 = report.pdfData.split(',')[1];
+  //       const binary = atob(base64);
+  //       const array = new Uint8Array(binary.length);
+  //       for (let i = 0; i < binary.length; i++) {
+  //         array[i] = binary.charCodeAt(i);
+  //       }
+  //       const blob = new Blob([array], { type: 'application/pdf' });
+  //       const url = URL.createObjectURL(blob);
         
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${report.diseaseName}-${new Date(report.createdAt).toLocaleDateString()}.pdf`;
-        a.click();
+  //       const a = document.createElement('a');
+  //       a.href = url;
+  //       a.download = `${report.diseaseName}-${new Date(report.createdAt).toLocaleDateString()}.pdf`;
+  //       a.click();
         
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      console.error('Download error:', error);
-      alert('Failed to download PDF');
-    }
-  };
+  //       URL.revokeObjectURL(url);
+  //     }
+  //   } catch (error) {
+  //     console.error('Download error:', error);
+  //     alert('Failed to download PDF');
+  //   }
+  // };
 
   const handleDeleteReport = async (reportId) => {
     if (!confirm('Are you sure you want to delete this report?')) return;
@@ -123,7 +123,9 @@ const ReportsHistory = () => {
       <div className="min-h-screen bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <button
-            onClick={() => setViewingReport(false)}
+            onClick={() => {setViewingReport(false)
+               setSelectedReport(null);
+            }}
             className="mb-6 flex items-center gap-2 text-white/60 hover:text-white transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,7 +135,7 @@ const ReportsHistory = () => {
           </button>
 
           <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-8">
-            <div className="flex items-center justify-between mb-6">
+            {/* <div className="flex items-center justify-between mb-6">
               <h2 className="text-3xl font-bold text-white">{selectedReport.diseaseName}</h2>
               <button
                 onClick={() => handleDownloadPDF(selectedReport)}
@@ -144,7 +146,7 @@ const ReportsHistory = () => {
                 </svg>
                 Download PDF
               </button>
-            </div>
+            </div> */}
 
             <div className="space-y-4 text-white/80">
               <p><strong>Prediction:</strong> {selectedReport.prediction}</p>

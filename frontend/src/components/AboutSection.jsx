@@ -122,17 +122,20 @@ export default function AboutSection() {
           <div className="w-full max-w-3xl space-y-8 lg:space-y-12">
             
             {/* Main Heading */}
-            <h2
-              ref={mainTextRef}
-              className="text-3xl sm:text-5xl md:text-4xl lg:text-4xl xl:text-5xl font-bold text-white leading-[1.1] tracking-tight"
-            >
-              I believe better systems create better lives. That belief has shaped my journey, from military service to tech innovation.
-            </h2>
+           <h2
+  ref={mainTextRef}
+  className="text-3xl sm:text-5xl md:text-4xl lg:text-4xl xl:text-5xl font-bold text-white leading-[1.2] tracking-tight"
+>
+  We believe better systems create better lives. That belief has shaped our journey,
+  <br className="hidden sm:block" />
+  towards Medical field.
+</h2>
+
 
             {/* Subtext */}
             <div ref={subTextRef} className="space-y-5 lg:space-y-6">
               <p className="text-lg sm:text-xl md:text-xl lg:text-xl text-gray-400 leading-relaxed">
-                That's why I have built systems like <span className="text-cyan-400 font-semibold">SymptoScan</span>, combining AI and healthcare expertise. My mission is to solve real-world challenges and improve how people live, work and access care.
+                That's why we have built systems like <span className="text-cyan-400 font-semibold">SymptoScan</span>, combining AI and healthcare expertise. Our mission is to solve real-world challenges and improve how people live, work and access care.
               </p>
             </div>
 
